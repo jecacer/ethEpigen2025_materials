@@ -1,0 +1,123 @@
+---
+title: "Untitled"
+author: "Julio Eduardo Cáceres Pajuelo"
+date: "2025-02-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+```{r}
+suppressPackageStartupMessages({
+  library(AnnotationHub)
+  library(ensembldb)      
+  library(GenomicRanges) 
+  library(epiwraps)      
+})
+```
+
+
+```{r}
+library(AnnotationHub)
+ah <- AnnotationHub()
+query_mouse_ensdb <- query(ah, c("EnsDb", "Mus musculus", "102", "GRCm38"))
+mouse_ensdb <- query_mouse_ensdb[[1]]  # Retrieve the EnsDb object
+mouse_ensdb
+
+```
+```{r}
+query_mouse_twobit <- query(ah, c("Mus musculus", "GRCm38", "TwoBit", "dna_sm"))
+mouse_twobit <- query_mouse_twobit[[1]]  # Retrieve the TwoBit file
+mouse_twobit
+```
+
+```{r}
+query_drosophila_twobit <- query(ah, c("Drosophila melanogaster", "BDGP6", "TwoBit", "dna_sm"))
+drosophila_twobit <- query_drosophila_twobit[[1]]  # Retrieve the TwoBit file
+drosophila_twobit
+
+```
+
+```{r}
+# Save the files locally
+saveRDS(mouse_ensdb, "Mouse_EnsDb_102_GRCm38.rds")
+saveRDS(mouse_twobit, "Mouse_GRCm38_dna_sm.2bit")
+saveRDS(drosophila_twobit, "Drosophila_BDGP6_dna_sm.2bit")
+
+```
+
+```{r}
+if (!requireNamespace("AnnotationHub", quietly = TRUE)) {
+    BiocManager::install("AnnotationHub")
+}
+library(AnnotationHub)
+
+```
+```{r}
+hub <- AnnotationHub()
+query(hub, c("EnsDb", "Mus musculus", "102"))
+
+```
+
+
+```{r}
+ensdb_mouse_v102 <- hub[["AH89211"]]
+
+```
+```{r}
+ensdb_mouse_v102
+```
+```{r}
+library(ensembldb)  # To manipulate EnsDb objects
+library(dplyr)  # For data manipulation
+
+# Extract protein-coding genes
+protein_coding_genes <- genes(ensdb_mouse_v102, filter = GeneBiotypeFilter("protein_coding"), 
+                              columns = c("gene_id", "gene_name"))
+
+# Count unique Ensembl gene IDs and gene symbols
+num_unique_gene_ids <- length(unique(protein_coding_genes$gene_id))
+num_unique_gene_symbols <- length(unique(protein_coding_genes$gene_name))
+
+cat("Number of unique Ensembl gene IDs:", num_unique_gene_ids, "\n")
+cat("Number of unique gene symbols:", num_unique_gene_symbols, "\n")
+
+
+```
+```{r}
+library(GenomicRanges)  # For handling genomic coordinates
+library(ggplot2)  # For plotting
+
+# Retrieve all exons grouped by transcript for protein-coding genes
+exons_by_transcript <- exonsBy(ensdb_mouse_v102, by = "tx", filter = GeneBiotypeFilter("protein_coding"))
+
+# Compute the total spliced length of each transcript by summing exon widths
+transcript_lengths <- sapply(exons_by_transcript, function(exon) sum(width(exon)))
+
+# Convert to a data frame for plotting
+length_df <- data.frame(TranscriptLength = transcript_lengths)
+
+# Plot distribution of spliced transcript lengths
+ggplot(length_df, aes(x = TranscriptLength)) +
+    geom_histogram(binwidth = 100, fill = "blue", color = "black", alpha = 0.7) +
+    scale_x_continuous(labels = scales::comma) +
+    labs(title = "Distribution of Spliced Transcript Lengths (Protein-Coding)",
+         x = "Spliced Transcript Length (bp)",
+         y = "Frequency") +
+    theme_minimal()
+
+```
+
+
+
+
+
