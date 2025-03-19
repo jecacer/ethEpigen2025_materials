@@ -1,0 +1,181 @@
+---
+title: "Assignment"
+author: "Julio Eduardo Cáceres Pajuelo"
+date: "2025-03-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+
+```{r}
+if (!requireNamespace("rtracklayer", quietly = TRUE)) install.packages("rtracklayer")
+if (!requireNamespace("R.utils", quietly = TRUE)) install.packages("R.utils")
+
+library(rtracklayer)
+library(R.utils)
+```
+
+
+```{r}
+url <- "https://www.encodeproject.org/files/ENCFF653YVR/@@download/ENCFF653YVR.bed.gz"
+destfile <- "p300.bed.gz"
+
+# Check if the compressed file already exists
+if (!file.exists("p300.bed")) {
+    download.file(url, destfile = destfile, mode = "wb")  # 'mode = "wb"' for binary files
+    gunzip(destfile, remove = FALSE)  # Keep the original compressed file
+} else {
+    message("File 'p300.bed' already exists. Skipping download and extraction.")
+}
+
+# Import the file
+p300 <- rtracklayer::import("p300.bed", format = "narrowPeak")
+
+# Display the first few rows of the imported data
+head(p300)
+
+```
+
+## 1.b) Histone modification H3K4me3
+```{r}
+download.file("https://www.encodeproject.org/files/ENCFF974BMC/@@download/ENCFF974BMC.bed.gz", destfile="H3K4me3.bed.gz")
+gunzip("H3K4me3.bed.gz")
+
+H3K4me3 <- rtracklayer::import("H3K4me3.bed", format ="narrowPeak")
+head(H3K4me3)
+```
+
+
+## 1.c) Histone modification H3K4me1
+
+```{r}
+download.file("https://www.encodeproject.org/files/ENCFF426IIV/@@download/ENCFF426IIV.bed.gz", destfile="H3K4me1.bed.gz")
+gunzip("H3K4me1.bed.gz")
+
+H3K4me1 <- rtracklayer::import("H3K4me1.bed", format ="narrowPeak")
+head(H3K4me1)
+```
+
+
+## 1.d) Histone modification H3K27ac
+
+```{r}
+download.file("https://www.encodeproject.org/files/ENCFF212HAG/@@download/ENCFF212HAG.bed.gz", destfile="H3K27ac.bed.gz")
+gunzip("H3K27ac.bed.gz")
+
+H3K27ac <- rtracklayer::import("H3K27ac.bed", format ="narrowPeak")
+head(H3K27ac)
+```
+
+
+## 1.e) Histone modification H3K27me3
+
+```{r}
+download.file("https://www.encodeproject.org/files/ENCFF558YNC/@@download/ENCFF558YNC.bed.gz", destfile="H3K27me3.bed.gz")
+gunzip("H3K27me3.bed.gz")
+
+H3K27me3 <- rtracklayer::import("H3K27me3.bed", format ="narrowPeak")
+head(H3K27me3)
+```
+
+
+# 2. 
+```{r}
+peaks_p300 <- length(p300)
+
+cat("The total number of p300 peaks is:", peaks_p300, "\n")
+
+```
+
+## 2.a) Overlap histone modification H3K4me3
+
+```{r}
+peaksOverlapsH3K4me3 <- overlapsAny(p300, H3K4me3)
+
+# Calculate the total number of overlapping peaks
+sumH3K4me3 <- sum(peaksOverlapsH3K4me3)
+
+# Calculate the proportion of overlapping peaks as a percentage
+proportion_H3K4me3 <- round((100 / peaks_p300 * sumH3K4me3), 3)
+
+# Display the total number of overlapping peaks
+sumH3K4me3
+
+# Display the calculated proportion
+print(paste(proportion_H3K4me3, "%"))
+
+
+```
+
+
+## 2.b) 
+```{r}
+peaksOverlapsH3K4me1 <- overlapsAny(p300, H3K4me1)
+
+# Calculate the total number of overlapping peaks
+sumH3K4me1 <- sum(peaksOverlapsH3K4me1)
+
+# Calculate the proportion of overlapping peaks as a percentage
+proportion_H3K4me1 <- round((100 / peaks_p300 * sumH3K4me1), 3)
+
+# Display the total number of overlapping peaks
+sumH3K4me1
+
+# Display the calculated proportion
+print(paste(proportion_H3K4me1, "%"))
+
+```
+
+
+## 2.c) 
+
+```{r}
+peaksOverlapsH3K27ac <- overlapsAny(p300, H3K27ac)
+
+# Calculate the total number of overlapping peaks
+sumH3K27ac <- sum(peaksOverlapsH3K27ac)
+
+# Calculate the proportion of overlapping peaks as a percentage
+proportion_H3K27ac <- round((100 / peaks_p300 * sumH3K27ac), 3)
+
+# Display the total number of overlapping peaks
+sumH3K27ac
+
+# Display the calculated proportion
+print(paste(proportion_H3K27ac, "%"))
+
+```
+
+
+## 2.d) 
+
+```{r}
+peaksOverlapsH3K27me3 <- overlapsAny(p300, H3K27me3)
+
+# Calculate the total number of overlapping peaks
+sumH3K27me3 <- sum(peaksOverlapsH3K27me3)
+
+# Calculate the proportion of overlapping peaks as a percentage
+proportion_H3K27me3 <- round((100 / peaks_p300 * sumH3K27me3), 3)
+
+# Display the total number of overlapping peaks
+sumH3K27me3
+
+# Display the calculated proportion
+print(paste(proportion_H3K27me3, "%"))
+
+```
+
+
+
+
