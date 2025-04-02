@@ -1,0 +1,85 @@
+---
+title: "Assignment6"
+author: "Julio Eduardo Cáceres Pajuelo"
+date: "2025-04-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Instalar BiocManager si es necesario
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+```
+```{r}
+required_pkgs <- c("AnnotationHub", "GenomicRanges", "ggplot2", "rtracklayer",
+                   "motifmatchr", "Biostrings", "MotifDb", "TFBSTools",
+                   "universalmotif", "PWMEnrich", "BSgenome.Hsapiens.UCSC.hg38")
+
+for (pkg in required_pkgs) {
+  if (!requireNamespace(pkg, quietly = TRUE))
+    BiocManager::install(pkg)
+}
+
+```
+```{r}
+library(AnnotationHub)
+library(GenomicRanges)
+library(ggplot2)
+library(rtracklayer)
+library(motifmatchr)
+library(Biostrings)
+library(MotifDb)
+library(TFBSTools)
+library(universalmotif)
+library(PWMEnrich)
+library(BSgenome.Hsapiens.UCSC.hg38)
+
+```
+```{r}
+url <- "https://www.encodeproject.org/files/ENCFF550TXR/@@download/ENCFF550TXR.bed.gz"
+download.file(url, destfile = "CREB1_HepG2_peaks.bed.gz")
+
+peaks <- rtracklayer::import("CREB1_HepG2_peaks.bed.gz", format = "narrowPeak")
+peaks_chr1 <- peaks[seqnames(peaks) == "chr1"]
+length(peaks_chr1)
+
+```
+```{r}
+motifs <- query(MotifDb, "CREB1")
+motif <- motifs[["Hsapiens-HOCOMOCOv10-CREB1_HUMAN.H10MO.A"]]
+conv_motif <- convert_motifs(motif, class = "TFBSTools-PWMatrix")
+
+```
+
+
+```{r}
+m_index <- matchMotifs(conv_motif,
+                       subject = peaks_chr1,
+                       genome = "BSgenome.Hsapiens.UCSC.hg38",
+                       out = "positions")
+m_index <- m_index[[1]]
+
+```
+
+```{r}
+peaks_with_motif <- sum(overlapsAny(peaks_chr1, m_index))
+peak_perc <- peaks_with_motif / length(peaks_chr1) * 100
+
+motifs_in_peaks <- sum(overlapsAny(m_index, peaks_chr1))
+motif_perc <- motifs_in_peaks / length(m_index) * 100
+
+```
+```{r}
+cat(sprintf("Out of %d peaks on chromosome 1, %d (%.2f%%) contain a CREB1 motif.\n",
+            length(peaks_chr1), peaks_with_motif, peak_perc))
+
+cat(sprintf("Out of %d CREB1 motif instances on chromosome 1, %d (%.2f%%) overlap a peak.\n",
+            length(m_index), motifs_in_peaks, motif_perc))
+
+```
+
+
+
