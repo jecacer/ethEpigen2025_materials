@@ -1,0 +1,126 @@
+---
+title: "Assignment8"
+author: "Julio Eduardo Cáceres Pajuelo"
+date: "2025-04-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+suppressPackageStartupMessages({
+  library(BiocManager)
+  library(SummarizedExperiment)
+  library(GenomicRanges)
+  library(GenomeInfoDb)
+  library(chromVAR)
+  library(motifmatchr)
+  library(TFBSTools)
+  library(universalmotif)
+  library(MotifDb)
+  library(BSgenome.Mmusculus.UCSC.mm10)
+  library(ggplot2)
+  library(limma)
+  library(sechm)
+  library(BiocParallel)
+})
+
+# Multithreading setup (change depending on OS)
+register(MulticoreParam(4))  # for UNIX
+# register(SerialParam())  # for Windows if needed
+```
+
+## Load and Prepare Data
+
+
+
+```{r}
+# Download and load ATAC-seq peak data in SummarizedExperiment format
+url <- "https://ethz-ins.org/content/mouse_mm38_hippocampus.peakCounts.SE.rds"
+download.file(url, destfile = "hippocampus.peakCounts.SE.rds", mode = "wb")
+se <- readRDS("hippocampus.peakCounts.SE.rds")
+
+# Adjust chromosome naming to UCSC style
+original_levels <- seqlevels(rowRanges(se))
+mapped_levels <- mapSeqlevels(original_levels, "UCSC")
+valid_levels <- mapped_levels[!is.na(mapped_levels)]
+se <- keepSeqlevels(se, names(valid_levels), pruning.mode = "coarse")
+se <- renameSeqlevels(se, valid_levels)
+```
+
+## Annotate Metadata
+
+```{r}
+# Manually annotate sample condition and gender
+colData(se)$condition <- c("CTRL", "CTRL", "CTRL", "CTRL", "CTRL", "CTRL",
+                          "FSS", "FSS", "FSS", "FSS", "FSS", "FSS")
+colData(se)$gender <- c("male", "male", "male", "male", "male", "male",
+                       "female", "female", "female", "female", "female", "female")
+```
+
+## Motif Matching and chromVAR Setup
+
+```{r}
+# Add GC bias correction
+se <- addGCBias(se, genome=BSgenome.Mmusculus.UCSC.mm10)
+
+# Retrieve motifs and convert
+motifs_raw <- query(MotifDb, c("HOCOMOCOv11-core", "Hsapiens"))
+motifs <- do.call(PWMatrixList, setNames(
+  convert_motifs(motifs_raw, class="TFBSTools-PWMatrix"),
+  mcols(motifs_raw)$geneSymbol))
+
+# Match motifs
+motif_ix <- matchMotifs(motifs, se, genome=BSgenome.Mmusculus.UCSC.mm10)
+
+# Compute deviations
+set.seed(1234)
+bg <- getBackgroundPeaks(se, niterations=500)
+dev <- computeDeviations(se, annotations=motif_ix, background_peaks=bg)
+```
+
+## Differential Accessibility: FSS vs CTRL
+
+```{r}
+dev$condition <- factor(dev$condition, levels=c("CTRL", "FSS"))
+mm <- model.matrix(~condition, data=as.data.frame(colData(dev)))
+fit <- eBayes(lmFit(assays(dev)$z, design=mm))
+res <- topTable(fit, coef="conditionFSS", number=Inf)
+res$TF <- rownames(res)
+
+# Volcano plot
+ggplot(res, aes(logFC, -log10(adj.P.Val), label=TF)) +
+  geom_point() +
+  geom_text(size=2, vjust=1.5, check_overlap=TRUE)
+
+# Heatmap
+metadata(dev)$anno_colors <- list(condition=c(CTRL="lightgrey", FSS="darkred"))
+sechm(dev, features=head(rownames(res)), assayName="z",
+      top_annotation=c("condition", "depth"))
+```
+## FSS vs CTRL: In the stress vs control comparison, motifs for GCR (glucocorticoid receptor) and PRGR (progesterone receptor) show increased accessibility in stressed animals. This is consistent with the activation of the HPA axis under stress, where GCR plays a central role. The heatmap confirms this pattern with clear separation between FSS and CTRL samples, suggesting robust and biologically meaningful differences.
+
+# Differential Accessibility: Male vs Female
+
+```{r}
+dev$gender <- factor(dev$gender, levels=c("male", "female"))
+mm_gender <- model.matrix(~gender, data=as.data.frame(colData(dev)))
+fit_gender <- eBayes(lmFit(assays(dev)$z, design=mm_gender))
+res_gender <- topTable(fit_gender, coef="genderfemale", number=Inf)
+res_gender$TF <- rownames(res_gender)
+
+# Volcano plot
+ggplot(res_gender, aes(logFC, -log10(adj.P.Val), label=TF)) +
+  geom_point() +
+  geom_text(size=2, vjust=1.5, check_overlap=TRUE)
+
+# Heatmap
+metadata(dev)$anno_colors <- list(gender=c(male="lightgrey", female="darkred"))
+sechm(dev, features=head(rownames(res_gender)), assayName="z",
+      top_annotation=c("gender", "depth"))
+```
+## Male vs Female: In the sex comparison, the same motifs (GCR, PRGR) also appear more accessible in females. This likely reflects sex-specific hormonal regulation, particularly for PRGR. The heatmap again shows consistent patterns between groups, supporting the idea that these differences are not technical artifacts but reflect underlying biological variation.
