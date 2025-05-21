@@ -1,0 +1,84 @@
+---
+title: "assignment11"
+author: "Julio Eduardo Cáceres Pajuelo"
+date: "2025-05-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+knitr::opts_chunk$set(warning = FALSE)
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+```{r}
+suppressPackageStartupMessages({
+  library(BiocParallel)
+  library(bsseq)
+  library(DMRcate)
+  library(rGREAT)
+  library(pheatmap)
+  library(GenomicRanges)
+})
+
+dmrs <- readRDS("C:/Users/edupa/Downloads/dmr.rds")
+bs <- readRDS("C:/Users/edupa/Downloads/ESC_astrocytes_BSseq.rds")
+
+```
+
+```{r}
+seqlevelsStyle(dmrs) <- "UCSC"
+dmrs_chr1 <- dmrs[seqnames(dmrs) == "chr1"]
+
+# Select top 20 DMRs with highest absolute mean methylation difference
+top20_chr1 <- head(dmrs_chr1[order(abs(dmrs_chr1$meandiff), decreasing = TRUE)], 20)
+
+# Clean BSseq: remove CpGs with 0 coverage
+bs <- bs[rowSums(assay(bs,"Cov") > 0) == ncol(bs), ]
+
+bs <- BSmooth(bs, BPPARAM = MulticoreParam(4))
+
+# average methylation values for each DMR across samples
+meth_top20 <- getMeth(bs, regions = top20_chr1, what = "perRegion")
+rownames(meth_top20) <- paste0("DMR_", seq_len(nrow(meth_top20)))
+
+# heatmap
+pheatmap(meth_top20,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE,
+         main = "Methylation in Top 20 chr1 DMRs",
+         color = colorRampPalette(c("blue", "white", "red"))(100))
+
+```
+```{r}
+job <- submitGreatJob(dmrs, species = "hg19")
+enrich_tables <- getEnrichmentTables(job, download_by = "tsv")
+
+# Top 5 GO terms from the Biological Process category
+go_bp <- enrich_tables$`GO Biological Process`
+knitr::kable(head(go_bp, 5), caption = "Top 5 Enriched GO Biological Processes")
+
+```
+```{r}
+# All FDR < 0.05
+go_bp_sig <- go_bp[go_bp$`Hyper FDR Q-Val` < 0.05, ]
+
+knitr::kable(go_bp_sig, caption = "GO Biological Processes (FDR < 0.05)")
+
+```
+
+Enriched GO terms like ketone metabolism regulation, somitogenesis, and organ development suggest that differential methylation may impact key developmental pathways. Genes such as WNT7B, NOTCH1, and PPARA support this link to cell fate and tissue specification.
+
+
+
+
+
